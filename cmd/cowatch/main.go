@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -56,33 +57,43 @@ func main() {
 }
 
 func run(c command, color string, sigintChan chan os.Signal) {
-	cmd := exec.Command("bash", "-c", c.Cmd)
+	cmdFields := strings.Fields(c.Cmd)
 
+	args := []string{}
+	if len(cmdFields) > 1 {
+		args = cmdFields[1:]
+	}
+
+	cmd := exec.Command(cmdFields[0], args...)
+
+	cmd.Stdin = os.Stdin
 	stdoutPipe, err := cmd.StdoutPipe()
 	stderrPipe, err := cmd.StderrPipe()
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	stdoutScanner := bufio.NewScanner(stdoutPipe)
-	for stdoutScanner.Scan() {
-		line := stdoutScanner.Text()
-		fmt.Fprintf(os.Stdout, "%v[%v > stdout]: %v%v\n", color, c.Name, line, codes.ResetColor)
-	}
-
-	stderrScanner := bufio.NewScanner(stderrPipe)
-	for stderrScanner.Scan() {
-		line := stderrScanner.Text()
-		fmt.Fprintf(os.Stdout, "%v[%v > stderr]: %v%v\n", color, c.Name, line, codes.ResetColor)
+		log.Fatal("couldn't start command", c.Name, err)
 	}
 
 	go func() {
-		<-sigintChan
-		if err := cmd.Process.Signal(syscall.SIGINT); err != nil {
-			fmt.Println(err)
+		stdoutScanner := bufio.NewScanner(stdoutPipe)
+		for stdoutScanner.Scan() {
+			line := stdoutScanner.Text()
+			fmt.Fprintf(os.Stdout, "%v[%v > stdout]: %v%v\n", color, c.Name, line, codes.ResetColor)
 		}
+	}()
+
+	go func() {
+		stderrScanner := bufio.NewScanner(stderrPipe)
+		for stderrScanner.Scan() {
+			line := stderrScanner.Text()
+			fmt.Fprintf(os.Stdout, "%v[%v > stderr]: %v%v\n", color, c.Name, line, codes.ResetColor)
+		}
+	}()
+
+	go func() {
+		<-sigintChan
+		cmd.Process.Signal(syscall.SIGINT)
 	}()
 
 	err = cmd.Wait()

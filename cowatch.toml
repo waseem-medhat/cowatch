@@ -1,15 +1,7 @@
-# [[commands]]
-# name = "google"
-# cmd = "ping google.com"
-#
-# [[commands]]
-# name = "duckgo"
-# cmd = "ping duck.com"
+[[commands]]
+name = "AIR"
+cmd = "air"
 
 [[commands]]
-name = "github"
-cmd = "ping github.com"
-
-[[commands]]
-name = "tw"
-cmd = "tailwindcss --input ./input.css --output ./styles.css --watch"
+name = "TWD"
+cmd = "tailwindcss --input ./static/input.css --output ./static/styles.css --watch"
