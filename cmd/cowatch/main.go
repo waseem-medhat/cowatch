@@ -11,7 +11,17 @@ import (
 	"syscall"
 
 	codes "github.com/avearmin/stylecodes"
+	"github.com/pelletier/go-toml"
 )
+
+type cfg struct {
+	Commands []command
+}
+
+type command struct {
+	Name string
+	Cmd  string
+}
 
 var colors = []string{
 	codes.ColorGreen,
@@ -22,35 +32,50 @@ var colors = []string{
 }
 
 func main() {
-	sites := []string{"google.com", "github.com", "duck.com"}
+	configBytes, err := os.ReadFile("cowatch.toml")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var config cfg
+	toml.Unmarshal(configBytes, &config)
+
 	wg := &sync.WaitGroup{}
 	sigintChan := make(chan os.Signal, 1)
 	signal.Notify(sigintChan, os.Interrupt)
 
-	for i, site := range sites {
+	for i, c := range config.Commands {
 		wg.Add(1)
-		go func(site string, color string) {
-			run(site, color, sigintChan)
+		go func(c command, color string) {
+			run(c, color, sigintChan)
 			wg.Done()
-		}(site, colors[i%len(colors)])
+		}(c, colors[i%len(colors)])
 	}
 
 	wg.Wait()
 }
 
-func run(site string, color string, sigintChan chan os.Signal) {
-	cmd := exec.Command("ping", site)
-	stdout, err := cmd.StdoutPipe()
+func run(c command, color string, sigintChan chan os.Signal) {
+	cmd := exec.Command("bash", "-c", c.Cmd)
+
+	stdoutPipe, err := cmd.StdoutPipe()
+	stderrPipe, err := cmd.StderrPipe()
 
 	err = cmd.Start()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	scanner := bufio.NewScanner(stdout)
-	for scanner.Scan() {
-		line := scanner.Text()
-		fmt.Fprintf(os.Stdout, "%v[%v]: %v%v\n", color, site, line, codes.ResetColor)
+	stdoutScanner := bufio.NewScanner(stdoutPipe)
+	for stdoutScanner.Scan() {
+		line := stdoutScanner.Text()
+		fmt.Fprintf(os.Stdout, "%v[%v > stdout]: %v%v\n", color, c.Name, line, codes.ResetColor)
+	}
+
+	stderrScanner := bufio.NewScanner(stderrPipe)
+	for stderrScanner.Scan() {
+		line := stderrScanner.Text()
+		fmt.Fprintf(os.Stdout, "%v[%v > stderr]: %v%v\n", color, c.Name, line, codes.ResetColor)
 	}
 
 	go func() {
@@ -62,6 +87,6 @@ func run(site string, color string, sigintChan chan os.Signal) {
 
 	err = cmd.Wait()
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintf(os.Stdout, "%v[%v error]: %v%v\n", color, c.Name, err, codes.ResetColor)
 	}
 }
