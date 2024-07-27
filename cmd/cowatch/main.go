@@ -33,6 +33,8 @@ var colors = []string{
 }
 
 func main() {
+	fmt.Println(codes.ColorMagenta, logo, codes.ResetColor)
+
 	configBytes, err := os.ReadFile("cowatch.toml")
 	if err != nil {
 		log.Fatal(err)
