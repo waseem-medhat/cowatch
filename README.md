@@ -1,5 +1,7 @@
 # Cowatch
 
+![cowatch gif demo](https://i.imgur.com/t7PyH7G.gif)
+
 **Run multiple commands/watchers concurrently.**
 
 This primarily targets development environments that rely on compilers but lack
