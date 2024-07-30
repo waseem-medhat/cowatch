@@ -32,7 +32,7 @@ var colors = []string{
 }
 
 func main() {
-	fmt.Println(codes.ColorBrightMagenta, logo, codes.ResetColor)
+	printLogo()
 
 	configBytes, err := os.ReadFile("cowatch.toml")
 	if err != nil {
@@ -49,14 +49,14 @@ func main() {
 
 	for i, c := range config.Commands {
 		wg.Add(1)
-		go func(c command, color string) {
+		go func() {
+			color := colors[i%len(colors)]
 			err := run(c, color, sigintChan)
 			if err != nil {
 				exitWithError(err)
 			}
-
 			wg.Done()
-		}(c, colors[i%len(colors)])
+		}()
 	}
 
 	wg.Wait()
