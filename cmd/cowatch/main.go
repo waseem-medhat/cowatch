@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -33,11 +32,12 @@ var colors = []string{
 }
 
 func main() {
-	fmt.Println(codes.ColorMagenta, logo, codes.ResetColor)
+	fmt.Println(codes.ColorBrightMagenta, logo, codes.ResetColor)
 
 	configBytes, err := os.ReadFile("cowatch.toml")
 	if err != nil {
-		log.Fatal(err)
+		err := fmt.Errorf("error reading config file\n↳ %v", err)
+		exitWithError(err)
 	}
 
 	var config cfg
@@ -50,7 +50,11 @@ func main() {
 	for i, c := range config.Commands {
 		wg.Add(1)
 		go func(c command, color string) {
-			run(c, color, sigintChan)
+			err := run(c, color, sigintChan)
+			if err != nil {
+				exitWithError(err)
+			}
+
 			wg.Done()
 		}(c, colors[i%len(colors)])
 	}
@@ -58,7 +62,7 @@ func main() {
 	wg.Wait()
 }
 
-func run(c command, color string, sigintChan chan os.Signal) {
+func run(c command, color string, sigintChan chan os.Signal) error {
 	cmdFields := strings.Fields(c.Cmd)
 
 	args := []string{}
@@ -74,7 +78,7 @@ func run(c command, color string, sigintChan chan os.Signal) {
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatal("couldn't start command", c.Name, err)
+		return fmt.Errorf("error starting command %v\n↳ %v", c.Name, err)
 	}
 
 	go func() {
@@ -100,6 +104,16 @@ func run(c command, color string, sigintChan chan os.Signal) {
 
 	err = cmd.Wait()
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "%v[%v error]: %v%v\n", color, c.Name, err, codes.ResetColor)
+		return fmt.Errorf("error exiting command %v\n↳ %v", c.Name, err)
 	}
+
+	return err
+}
+
+func exitWithError(err error) {
+	fmt.Print(codes.ColorBrightRed)
+	fmt.Println(err)
+	fmt.Println(codes.ResetColor)
+
+	os.Exit(1)
 }
